@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusPulse - Secure Access</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .hidden { display: none !important; }
+        .animate-fade { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } }
+        .critical-pulse { animation: pulse-red 2s infinite; border: 1px solid #ef4444; }
+        html { scroll-behavior: smooth; }
+        ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-track { background: #0f172a; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen font-sans pb-24">
+
+<header class="fixed top-0 w-full z-50 bg-slate-900/90 backdrop-blur border-b border-slate-800">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="flex items-center gap-3"><i class="fas fa-heartbeat text-cyan-500 text-2xl"></i><h1 class="text-xl font-bold tracking-tight">CampusPulse</h1></div>
+        <div class="flex items-center gap-4"><span id="header-user" class="text-xs font-bold text-cyan-400 hidden"></span><button id="logout-btn" onclick="logout()" class="hidden text-xs text-red-400 hover:text-white">Logout</button></div>
+    </div>
+</header>
+
+<div id="image-modal" class="hidden fixed inset-0 z-[60] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-fade" onclick="closeImage()">
+    <button onclick="closeImage()" class="absolute top-5 right-5 text-white text-4xl hover:text-red-500 transition">&times;</button><img id="modal-img" src="" class="max-w-full max-h-[90vh] rounded-lg shadow-2xl border border-slate-700">
+</div>
+
+<div id="reopen-modal" class="hidden fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade">
+    <div class="glass p-6 rounded-2xl w-full max-w-sm border border-slate-700">
+        <h3 class="text-lg font-bold mb-4 text-white">Reopen Issue</h3>
+        <p class="text-xs text-slate-400 mb-2">Why was the fix insufficient?</p>
+        <textarea id="reopen-reason" rows="3" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-sm outline-none text-white mb-3 placeholder-slate-500" placeholder="Describe the problem..."></textarea>
+        <p class="text-xs text-slate-400 mb-2">Upload Proof (Optional)</p>
+        <input type="file" id="reopen-image" class="w-full bg-slate-800 text-xs text-slate-400 border border-slate-600 rounded-lg p-2 mb-4">
+        <div class="flex gap-2">
+            <button onclick="closeReopenModal()" class="flex-1 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
+            <button onclick="submitReopen()" class="flex-1 bg-red-600 hover:bg-red-500 py-2 rounded-lg font-bold text-sm shadow-lg">Confirm Reopen</button>
+        </div>
+    </div>
+</div>
+
+<main class="container mx-auto px-4 mt-24">
+    <div id="view-auth" class="max-w-xl mx-auto mt-10 animate-fade">
+        <div class="glass p-8 rounded-2xl relative">
+
+            <div class="absolute top-4 right-4 flex gap-3">
+                <button onclick="showGate('ADMIN')" class="text-[10px] text-slate-500 hover:text-orange-400 flex items-center gap-1 transition"><i class="fas fa-user-cog"></i> Admin</button>
+                <button onclick="showGate('HOD')" class="text-[10px] text-slate-500 hover:text-cyan-400 flex items-center gap-1 transition"><i class="fas fa-building"></i> HOD</button>
+                <button onclick="showGate('PRINCIPAL')" class="text-[10px] text-slate-500 hover:text-purple-400 flex items-center gap-1 transition"><i class="fas fa-user-shield"></i> Principal</button>
+            </div>
+
+            <div id="auth-standard">
+                <div class="flex mb-8 border-b border-slate-700 relative">
+                    <button onclick="switchAuthTab('login')" id="tab-login" class="flex-1 py-3 text-sm font-bold text-cyan-400 border-b-2 border-cyan-400 transition-all">Student/Staff Login</button>
+                    <button onclick="switchAuthTab('register')" id="tab-register" class="flex-1 py-3 text-sm font-bold text-slate-500 border-b-2 border-transparent hover:text-white transition-all">Register</button>
+                </div>
+                <form id="form-login" onsubmit="handleLogin(event)" class="space-y-5">
+                    <input type="text" id="login-user" required placeholder="Username" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 outline-none focus:border-cyan-500 transition">
+                    <input type="password" id="login-pass" required placeholder="Password" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 outline-none focus:border-cyan-500 transition">
+                    <button type="submit" class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 py-3 rounded-lg font-bold shadow-lg hover:shadow-cyan-500/20 transition">Sign In</button>
+                </form>
+
+                <form id="form-register" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+                    <div class="bg-slate-800/50 p-3 rounded-lg border border-slate-700 mb-2">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">I am a...</label>
+                        <select id="reg-type" onchange="toggleRegType()" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm outline-none"><option value="STUDENT">Student</option><option value="STAFF">Teacher / Staff</option></select>
+                        <div id="admin-request-box" class="hidden mt-3 pt-3 border-t border-slate-700"><label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="reg-is-admin" class="w-5 h-5 accent-cyan-500 rounded"><div><span class="block text-sm font-bold text-white">Request Admin Access?</span><span class="block text-[10px] text-slate-400">Requires Principal Approval</span></div></label></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2"><input type="text" id="reg-fname" required placeholder="First Name *" class="col-span-1 bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm outline-none"><input type="text" id="reg-mname" placeholder="Middle" class="col-span-1 bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm outline-none"><input type="text" id="reg-lname" required placeholder="Last Name *" class="col-span-1 bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm outline-none"></div>
+                    <input type="number" id="reg-phone" required placeholder="Phone (10 Digits) *" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm outline-none">
+                    <div id="fields-student" class="space-y-2 p-3 bg-slate-800/30 rounded-lg border border-slate-700/50">
+                        <p class="text-[10px] uppercase text-cyan-400 font-bold">Student Details</p>
+                        <div class="grid grid-cols-2 gap-2"><select id="reg-branch" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm outline-none"><option value="">Branch</option><option>CSE</option><option>ECE</option><option>ME</option><option>CE</option></select><select id="reg-year" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm outline-none"><option value="">Year</option><option>1st</option><option>2nd</option><option>3rd</option><option>4th</option></select></div>
+                        <div class="grid grid-cols-2 gap-2"><input type="text" id="reg-regno" placeholder="Reg No." class="bg-slate-900 border border-slate-700 rounded p-2 text-sm outline-none"><input type="text" id="reg-rollno" placeholder="Roll No." class="bg-slate-900 border border-slate-700 rounded p-2 text-sm outline-none"></div>
+                    </div>
+                    <div id="fields-staff" class="hidden space-y-2 p-3 bg-slate-800/30 rounded-lg border border-slate-700/50">
+                        <p class="text-[10px] uppercase text-green-400 font-bold">Staff Details</p>
+                        <div class="grid grid-cols-2 gap-2"><input type="text" id="reg-empid" placeholder="Employee ID (e.g. ABC123)" pattern="[A-Za-z0-9]+" title="Alphanumeric Only" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm outline-none"><select id="reg-dept" class="bg-slate-900 border border-slate-700 rounded p-2 text-sm outline-none"><option value="">Department</option><option>CSE</option><option>ECE</option><option>ME</option><option>CE</option><option>Physics</option><option>Maths</option><option>Administration</option></select></div>
+                    </div>
+                    <div class="border-t border-slate-700 pt-3"><input type="text" id="reg-username" required placeholder="Choose Username *" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 mb-2 text-sm outline-none"><input type="password" id="reg-pass" required placeholder="Create Password *" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 mb-2 text-sm outline-none"><input type="text" id="reg-pin" required maxlength="4" placeholder="4-Digit PIN (For Recovery) *" class="w-full bg-slate-800 border-2 border-yellow-600/30 rounded-lg p-3 text-sm focus:border-yellow-500 outline-none"></div>
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-500 py-3 rounded-lg font-bold transition">Create Account</button>
+                </form>
+            </div>
+
+            <div id="auth-gate" class="hidden text-center py-10">
+                <div class="mb-4 text-4xl" id="gate-icon"></div>
+                <h3 class="text-xl font-bold mb-2" id="gate-title">Restricted Access</h3>
+                <div id="hod-select-box" class="hidden mb-4">
+                    <select id="hod-dept-select" class="bg-slate-900 border border-slate-600 rounded p-2 outline-none text-white w-48 mx-auto"><option value="">Select Dept</option><option>CSE</option><option>ECE</option><option>ME</option><option>EE</option><option>CE</option></select>
+                </div>
+                <input type="password" id="gate-code" maxlength="4" class="bg-slate-900 border border-slate-500 rounded text-center text-2xl tracking-[0.5em] w-32 p-2 outline-none focus:border-white mb-6" placeholder="••••">
+                <div class="flex gap-2 justify-center"><button onclick="cancelGate()" class="px-4 py-2 text-slate-400 text-sm hover:text-white">Cancel</button><button onclick="checkGateCode()" class="px-6 py-2 bg-slate-700 rounded-lg font-bold hover:bg-slate-600">Verify</button></div>
+            </div>
+
+            <div id="auth-principal-login" class="hidden">
+                <div class="text-center mb-6">
+                    <div class="inline-block p-3 rounded-full bg-purple-500/20 text-purple-400 text-2xl mb-2"><i class="fas fa-user-shield"></i></div>
+                    <h2 class="text-2xl font-bold text-white">Principal Login</h2>
+                    <p class="text-xs text-purple-300">Authorized Personnel Only</p>
+                </div>
+                <form onsubmit="handlePrincipalLogin(event)" class="space-y-5">
+                    <input type="text" id="prin-user" required placeholder="Principal ID" class="w-full bg-slate-800 border border-purple-900/50 rounded-lg p-3 outline-none focus:border-purple-500 transition">
+                    <input type="password" id="prin-pass" required placeholder="Secure Password" class="w-full bg-slate-800 border border-purple-900/50 rounded-lg p-3 outline-none focus:border-purple-500 transition">
+                    <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 py-3 rounded-lg font-bold shadow-lg hover:shadow-purple-500/30 transition">Access Dashboard</button>
+                </form>
+                <button onclick="cancelGate()" class="w-full text-center text-[10px] text-slate-500 mt-4 hover:text-white">Return to Main Menu</button>
+            </div>
+
+            <div id="auth-hod-login" class="hidden">
+                <div class="text-center mb-6">
+                    <div class="inline-block p-3 rounded-full bg-cyan-500/20 text-cyan-400 text-2xl mb-2"><i class="fas fa-building"></i></div>
+                    <h2 class="text-2xl font-bold text-white">HOD Login</h2>
+                    <p class="text-xs text-cyan-300">Department Head Access</p>
+                </div>
+                <form onsubmit="handleHodLogin(event)" class="space-y-5">
+                    <input type="text" id="hod-user" required placeholder="HOD Username" class="w-full bg-slate-800 border border-cyan-900/50 rounded-lg p-3 outline-none focus:border-cyan-500 transition">
+                    <input type="password" id="hod-pass" required placeholder="Secure Password" class="w-full bg-slate-800 border border-cyan-900/50 rounded-lg p-3 outline-none focus:border-cyan-500 transition">
+                    <button type="submit" class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 py-3 rounded-lg font-bold shadow-lg hover:shadow-cyan-500/30 transition">Access Department</button>
+                </form>
+                <button onclick="cancelGate()" class="w-full text-center text-[10px] text-slate-500 mt-4 hover:text-white">Return to Main Menu</button>
+            </div>
+
+            <div id="auth-admin-login" class="hidden">
+                <div class="text-center mb-6">
+                    <div class="inline-block p-3 rounded-full bg-orange-500/20 text-orange-400 text-2xl mb-2"><i class="fas fa-user-cog"></i></div>
+                    <h2 class="text-2xl font-bold text-white">Admin Login</h2>
+                    <p class="text-xs text-orange-300">Maintenance & Infrastructure Team</p>
+                </div>
+                <form onsubmit="handleAdminLogin(event)" class="space-y-5">
+                    <input type="text" id="admin-user" required placeholder="Admin Username" class="w-full bg-slate-800 border border-orange-900/50 rounded-lg p-3 outline-none focus:border-orange-500 transition">
+                    <input type="password" id="admin-pass" required placeholder="Secure Password" class="w-full bg-slate-800 border border-orange-900/50 rounded-lg p-3 outline-none focus:border-orange-500 transition">
+                    <button type="submit" class="w-full bg-gradient-to-r from-orange-600 to-red-600 py-3 rounded-lg font-bold shadow-lg hover:shadow-orange-500/30 transition">Access Tasks</button>
+                </form>
+                <button onclick="cancelGate()" class="w-full text-center text-[10px] text-slate-500 mt-4 hover:text-white">Return to Main Menu</button>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="view-dashboard" class="hidden animate-fade mt-10">
+        <div class="text-center mb-8"><h2 class="text-3xl font-bold">Welcome, <span id="dash-name" class="text-cyan-400">User</span></h2><p class="text-slate-400">Access Granted.</p></div>
+        <div class="glass p-6 rounded-2xl max-w-2xl mx-auto mb-8 relative overflow-hidden">
+            <div class="absolute top-0 right-0 bg-slate-800 pl-4 pb-2 pt-2 pr-4 rounded-bl-2xl border-l border-b border-slate-700"><span id="dash-role-badge" class="text-xs font-bold text-cyan-400">STUDENT</span></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm mt-4"><div><p class="text-slate-500 uppercase text-[10px] font-bold mb-2">Identify</p><div class="text-xl font-bold mb-1" id="dash-fullname"></div><div class="text-slate-400" id="dash-phone"></div></div><div><p class="text-slate-500 uppercase text-[10px] font-bold mb-2">Details</p><div class="text-lg font-medium text-slate-200" id="dash-detail"></div><div class="text-slate-400 text-xs mt-1" id="dash-subdetail"></div></div></div>
+        </div>
+        <div class="text-center"><button id="btn-enter-app" onclick="enterMainApp()" class="px-10 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-full font-bold shadow-lg hover:scale-105 transition">Open Application <i class="fas fa-arrow-right ml-2"></i></button></div>
+    </div>
+
+    <div id="view-main-app" class="hidden animate-fade">
+        <div id="view-principal" class="hidden space-y-8">
+            <div class="flex justify-between items-end"><div><h2 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Principal's Console</h2><p class="text-slate-400 text-sm">Staff Administration Panel</p></div><button onclick="fetchAllPrincipalData()" class="text-sm text-cyan-400 hover:text-white"><i class="fas fa-sync-alt mr-1"></i> Refresh All</button></div>
+            <div class="glass p-6 rounded-2xl border-l-4 border-blue-500"><h3 class="text-lg font-bold mb-4 flex items-center gap-2 text-blue-400"><i class="fas fa-clock"></i> Position Requests <span id="count-pending" class="bg-blue-900 text-blue-200 px-2 py-0.5 rounded-full text-xs">0</span></h3><div id="list-pending" class="space-y-3"></div></div>
+            <div class="glass p-6 rounded-2xl border-l-4 border-green-500"><h3 class="text-lg font-bold mb-4 flex items-center gap-2 text-green-400"><i class="fas fa-check-circle"></i> Position Accepted <span id="count-accepted" class="bg-green-900 text-green-200 px-2 py-0.5 rounded-full text-xs">0</span></h3><div id="list-accepted" class="space-y-3"></div></div>
+            <div class="glass p-6 rounded-2xl border-l-4 border-red-500"><h3 class="text-lg font-bold mb-4 flex items-center gap-2 text-red-400"><i class="fas fa-ban"></i> Position Rejected <span id="count-rejected" class="bg-red-900 text-red-200 px-2 py-0.5 rounded-full text-xs">0</span></h3><div id="list-rejected" class="space-y-3"></div></div>
+        </div>
+
+        <div id="view-hod" class="hidden space-y-6">
+            <div class="flex justify-between items-end">
+                <div>
+                    <h2 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">HOD Console</h2>
+                    <p class="text-slate-400 text-sm">Department: <span id="hod-dept-name" class="font-bold text-white">---</span></p>
+                </div>
+                <button onclick="fetchIssues()" class="text-sm text-cyan-400 hover:text-white"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
+            </div>
+            <div id="hod-category-stats-container" class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-2 overflow-x-auto pb-2"></div>
+            <div class="glass p-5 rounded-2xl border-l-4 border-cyan-500">
+                <h3 class="text-lg font-bold mb-4 text-cyan-400 flex items-center gap-2">
+                    <i class="fas fa-inbox"></i> New & Open Requests
+                    <span id="cnt-hod-open" class="text-xs bg-cyan-900 px-2 py-0.5 rounded-full text-white">0</span>
+                </h3>
+                <div id="hod-list-open" class="space-y-3"></div>
+            </div>
+            <div class="glass p-5 rounded-2xl border-l-4 border-yellow-500">
+                <h3 class="text-lg font-bold mb-4 text-yellow-400 flex items-center gap-2">
+                    <i class="fas fa-hard-hat"></i> Work In Progress
+                    <span id="cnt-hod-prog" class="text-xs bg-yellow-900 px-2 py-0.5 rounded-full text-white">0</span>
+                </h3>
+                <p class="text-xs text-slate-500 mb-2 italic">Includes "Admin Started" (Needs Approval) & "Public Progress"</p>
+                <div id="hod-list-prog" class="space-y-3"></div>
+            </div>
+            <div class="glass p-5 rounded-2xl border-l-4 border-green-500">
+                <h3 class="text-lg font-bold mb-4 text-green-400 flex items-center gap-2">
+                    <i class="fas fa-check-double"></i> Resolution & History
+                    <span id="cnt-hod-res" class="text-xs bg-green-900 px-2 py-0.5 rounded-full text-white">0</span>
+                </h3>
+                <p class="text-xs text-slate-500 mb-2 italic">Includes "Admin Finished" (Needs Verification) & "Closed"</p>
+                <div id="hod-list-res" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <div id="view-regular-app" class="hidden">
+            <div id="view-feed" class="space-y-6">
+                <div id="category-stats-container" class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-6 overflow-x-auto pb-2">
+                </div>
+                <div class="grid grid-cols-3 gap-2 sticky top-20 z-40 bg-slate-900/95 py-2 backdrop-blur">
+                    <button onclick="scrollToSection('section-open')" class="bg-slate-800 border border-slate-700 p-3 rounded-xl flex flex-col items-center hover:bg-slate-700 transition"><span class="text-[10px] text-slate-400 uppercase font-bold">Open</span><span id="stat-open" class="text-xl font-bold text-cyan-400">0</span></button>
+                    <button onclick="scrollToSection('section-progress')" class="bg-slate-800 border border-slate-700 p-3 rounded-xl flex flex-col items-center hover:bg-slate-700 transition"><span class="text-[10px] text-slate-400 uppercase font-bold">Working</span><span id="stat-progress" class="text-xl font-bold text-yellow-500">0</span></button>
+                    <button onclick="scrollToSection('section-resolved')" class="bg-slate-800 border border-slate-700 p-3 rounded-xl flex flex-col items-center hover:bg-slate-700 transition"><span class="text-[10px] text-slate-400 uppercase font-bold">Done</span><span id="stat-resolved" class="text-xl font-bold text-green-500">0</span></button>
+                </div>
+                <div class="flex justify-between items-end"><h2 class="text-lg font-bold">Issue Board</h2><button onclick="fetchIssues()" class="text-xs text-cyan-400"><i class="fas fa-sync"></i> Refresh</button></div>
+                <div id="section-verify" class="hidden"><h3 class="text-xs font-bold text-blue-400 uppercase mb-3 flex items-center gap-2"><i class="fas fa-bell animate-bounce"></i> Needs Your Confirmation</h3><div id="feed-verify" class="grid gap-4"></div></div>
+                <div id="section-open"><h3 class="text-xs font-bold text-cyan-400 uppercase mb-3 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-cyan-400"></span> Open Issues</h3><div id="feed-open" class="grid gap-4"></div></div>
+                <div id="section-progress" class="hidden"><h3 class="text-xs font-bold text-yellow-500 uppercase mb-3 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-yellow-500"></span> Work In Progress</h3><div id="feed-progress" class="grid gap-4"></div></div>
+                <div id="section-resolved" class="hidden"><h3 class="text-xs font-bold text-green-500 uppercase mb-3 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-green-500"></span> Resolved History</h3><div id="feed-resolved" class="grid gap-4 opacity-60 hover:opacity-100 transition"></div></div>
+            </div>
+
+
+            <div id="view-report" class="hidden">
+                <h2 class="text-2xl font-bold mb-6">Report Issue</h2>
+                <form onsubmit="submitReport(event)" class="space-y-5">
+                    <input type="text" id="input-title" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 outline-none" placeholder="Title">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                            <label class="block text-xs text-slate-400 mb-1">Affected Department?</label>
+                            <select id="input-target-dept" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 outline-none text-white">
+                                <option value="General">Other / General (Direct to Admin)</option>
+                                <option>CSE</option>
+                                <option>ECE</option>
+                                <option>ME</option>
+                                <option>EE</option>
+                                <option>CE</option>
+                            </select>
+                        </div>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4"><label class="block text-xs text-slate-400 mb-1">When did it start?</label><input type="date" id="input-date" onclick="this.showPicker()" style="color-scheme: dark;" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 outline-none text-white cursor-pointer"></div>
+                    </div>
+                    <div class="relative"><textarea id="input-desc" required rows="3" onkeyup="updateAIPreview()" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 outline-none" placeholder="Description..."></textarea><div class="absolute bottom-4 right-4 bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-600 text-xs">AI Detected: <span id="ai-badge" class="font-bold text-slate-400">Waiting...</span></div></div>
+
+                    <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-4 mt-4">
+                        <label class="block text-xs text-slate-400 mb-1">Issue Category (Required)</label>
+                        <select id="input-category" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 outline-none text-white">
+                            <option value="Electrical">🔌 Electrical (Fan, Light, AC)</option>
+                            <option value="Plumbing">🚰 Plumbing (Water, Leakage)</option>
+                            <option value="Furniture">🪑 Furniture (Bench, Desk, Door)</option>
+                            <option value="IT">💻 IT & Network (Wi-Fi, Projector)</option>
+                            <option value="Civil">🧱 Civil (Wall, Floor, Window)</option>
+                            <option value="Cleanliness">🧹 Cleanliness (Garbage, Dust)</option>
+                            <option value="Other">❓ Other</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <select id="input-location" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 outline-none">
+                            <option>Classroom</option>
+                            <option>Lecture Theatre (LT)</option>
+                            <option>Labs</option>
+                            <option>Library</option>
+                            <option>College Ground</option>
+                            <option>Hostel</option>
+                            <option>Canteen</option>
+                            <option>Auditorium</option>
+                            <option>Parking Area</option>
+                            <option>Others</option>
+                        </select>
+                        <select id="input-manual-priority" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 outline-none text-cyan-400 font-bold"><option value="AUTO">✨ Use AI Detection</option><option value="CRITICAL">🔴 Force Critical</option><option value="Medium">🟡 Force Medium</option><option value="Low">🟢 Force Low</option></select>
+                    </div>
+
+                    <div class="bg-slate-800 p-2 border border-slate-700 rounded-xl">
+                        <label class="block text-xs text-slate-400 mb-1 ml-2">Attach Photo (Optional)</label>
+                        <input type="file" id="input-image" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500">
+                    </div>
+                    <button type="submit" id="submit-btn" class="w-full bg-cyan-600 py-4 rounded-xl font-bold shadow-lg hover:scale-105 transition">Submit Report</button>
+                </form>
+            </div>
+
+            <div id="view-admin" class="hidden space-y-6">
+                <div id="admin-category-stats-container" class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-2 overflow-x-auto pb-2"></div>
+                <div class="grid grid-cols-3 gap-2 sticky top-20 z-40 bg-slate-900/95 py-2 backdrop-blur">
+                    <button onclick="scrollToSection('admin-sec-open')" class="bg-slate-800 border border-slate-700 p-3 rounded-xl flex flex-col items-center hover:bg-slate-700 transition"><span class="text-[10px] text-slate-400 uppercase font-bold">Inbox</span><span id="admin-stat-open" class="text-xl font-bold text-cyan-400">0</span></button>
+                    <button onclick="scrollToSection('admin-sec-progress')" class="bg-slate-800 border border-slate-700 p-3 rounded-xl flex flex-col items-center hover:bg-slate-700 transition"><span class="text-[10px] text-slate-400 uppercase font-bold">Active</span><span id="admin-stat-progress" class="text-xl font-bold text-yellow-500">0</span></button>
+                    <button onclick="scrollToSection('admin-sec-resolved')" class="bg-slate-800 border border-slate-700 p-3 rounded-xl flex flex-col items-center hover:bg-slate-700 transition"><span class="text-[10px] text-slate-400 uppercase font-bold">Done</span><span id="admin-stat-resolved" class="text-xl font-bold text-green-500">0</span></button>
+                </div>
+                <div class="flex justify-between items-end"><h2 class="text-lg font-bold">Admin Management</h2><button onclick="fetchIssues()" class="text-xs text-cyan-400"><i class="fas fa-sync"></i> Refresh</button></div>
+                <div id="admin-sec-open"><h3 class="text-xs font-bold text-cyan-400 uppercase mb-3 border-b border-cyan-500/20 pb-2">Incoming Issues</h3><div id="admin-list-open" class="grid gap-3"></div></div>
+                <div id="admin-sec-progress" class="hidden"><h3 class="text-xs font-bold text-yellow-500 uppercase mb-3 border-b border-yellow-500/20 pb-2">Active Tasks</h3><div id="admin-list-progress" class="grid gap-3"></div></div>
+                <div id="admin-sec-resolved" class="hidden"><h3 class="text-xs font-bold text-green-500 uppercase mb-3 border-b border-green-500/20 pb-2">Completed</h3><div id="admin-list-resolved" class="grid gap-3"></div></div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<nav id="bottom-nav" class="hidden fixed bottom-0 w-full bg-slate-900/95 backdrop-blur border-t border-slate-800 pb-safe z-50">
+    <div class="flex justify-around items-center h-16">
+        <button onclick="switchAppView('feed')" id="nav-feed" class="text-cyan-400 flex flex-col items-center"><i class="fas fa-home text-xl"></i><span class="text-[10px]">Feed</span></button>
+        <button id="nav-add-btn" onclick="switchAppView('report')" class="bg-cyan-500 text-white rounded-full w-14 h-14 flex items-center justify-center -mt-8 border-[6px] border-slate-900 shadow-lg hover:scale-110 transition"><i class="fas fa-plus text-xl"></i></button>
+        <button id="nav-admin-btn" onclick="switchAppView('admin')" class="hidden text-slate-500 flex flex-col items-center hover:text-white transition"><i class="fas fa-shield-alt text-xl"></i><span class="text-[10px]">Manage</span></button>
+    </div>
+</nav>
+
+<script>
+    const API_BASE = "/api";
+    let currentReopenId = null;
+    let currentUser = null;
+
+    // NEW: Store data globally for filtering
+    let globalIssuesData = [];
+    let activeCategoryFilter = null; // Stores 'Plumbing', 'Electrical', etc.
+
+
+
+    // --- SECURE CODES ---
+    const SECRET_CODE_PRINCIPAL = "7777";
+    const SECRET_CODE_HOD = "5555";
+    const SECRET_CODE_ADMIN = "1111"; // New Admin Code
+
+    let gateType = "";
+    let gateSelectedDept = "";
+
+    function openImage(src) { document.getElementById('image-modal').classList.remove('hidden'); document.getElementById('modal-img').src = src; }
+    function closeImage() { document.getElementById('image-modal').classList.add('hidden'); }
+    function scrollToSection(id) { document.getElementById(id).classList.remove('hidden'); document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+    function switchAuthTab(tab) {
+        document.getElementById('form-login').classList.toggle('hidden', tab !== 'login'); document.getElementById('form-register').classList.toggle('hidden', tab !== 'register');
+        const tLogin = document.getElementById('tab-login'), tReg = document.getElementById('tab-register');
+        tLogin.className = tab==='login' ? "flex-1 py-3 text-sm font-bold text-cyan-400 border-b-2 border-cyan-400 transition-all" : "flex-1 py-3 text-sm font-bold text-slate-500 border-b-2 border-transparent hover:text-white transition-all";
+        tReg.className = tab==='register' ? "flex-1 py-3 text-sm font-bold text-cyan-400 border-b-2 border-cyan-400 transition-all" : "flex-1 py-3 text-sm font-bold text-slate-500 border-b-2 border-transparent hover:text-white transition-all";
+    }
+    function togglePass(id) { const el=document.getElementById(id); el.type=el.type==='password'?'text':'password'; }
+    function toggleRegType() { const type = document.getElementById('reg-type').value; document.getElementById('fields-student').classList.toggle('hidden', type !== 'STUDENT'); document.getElementById('fields-staff').classList.toggle('hidden', type !== 'STAFF'); document.getElementById('admin-request-box').classList.toggle('hidden', type !== 'STAFF'); }
+
+    // --- GATE LOGIC (UPDATED) ---
+    function showGate(type) {
+        gateType = type;
+        document.getElementById('auth-standard').classList.add('hidden'); document.getElementById('auth-gate').classList.remove('hidden'); document.getElementById('gate-code').value='';
+
+        if(type === 'HOD') {
+            document.getElementById('gate-icon').innerHTML = '<i class="fas fa-building text-cyan-400"></i>';
+            document.getElementById('gate-title').innerText = "HOD Access";
+            document.getElementById('hod-select-box').classList.remove('hidden');
+        } else if (type === 'ADMIN') {
+            document.getElementById('gate-icon').innerHTML = '<i class="fas fa-user-cog text-orange-400"></i>';
+            document.getElementById('gate-title').innerText = "Admin Access";
+            document.getElementById('hod-select-box').classList.add('hidden');
+        } else {
+            document.getElementById('gate-icon').innerHTML = '<i class="fas fa-user-shield text-purple-400"></i>';
+            document.getElementById('gate-title').innerText = "Principal Access";
+            document.getElementById('hod-select-box').classList.add('hidden');
+        }
+    }
+
+    function checkGateCode() {
+        const code = document.getElementById('gate-code').value;
+        const valid = (gateType === 'PRINCIPAL' && code === SECRET_CODE_PRINCIPAL) ||
+            (gateType === 'HOD' && code === SECRET_CODE_HOD) ||
+            (gateType === 'ADMIN' && code === SECRET_CODE_ADMIN);
+
+        if (valid) {
+            // Check HOD Department Selection
+            if(gateType === 'HOD') {
+                const deptSelect = document.getElementById('hod-dept-select').value;
+                if(deptSelect === "") { alert("Please select your department"); return; }
+                gateSelectedDept = deptSelect;
+                document.getElementById('auth-hod-login').classList.remove('hidden');
+            }
+            else if (gateType === 'ADMIN') {
+                document.getElementById('auth-admin-login').classList.remove('hidden');
+            }
+            else {
+                document.getElementById('auth-principal-login').classList.remove('hidden');
+            }
+            document.getElementById('auth-gate').classList.add('hidden');
+        } else {
+            alert("⛔ Invalid Security Code");
+        }
+    }
+
+    function cancelGate() {
+        document.getElementById('auth-gate').classList.add('hidden');
+        document.getElementById('auth-principal-login').classList.add('hidden');
+        document.getElementById('auth-hod-login').classList.add('hidden');
+        document.getElementById('auth-admin-login').classList.add('hidden');
+        document.getElementById('auth-standard').classList.remove('hidden');
+    }
+
+    // --- LOGIN HANDLERS (UPDATED) ---
+    async function handleLogin(e) { e.preventDefault(); loginUser(document.getElementById('login-user').value, document.getElementById('login-pass').value, 'STANDARD'); }
+    async function handlePrincipalLogin(e) { e.preventDefault(); loginUser(document.getElementById('prin-user').value, document.getElementById('prin-pass').value, 'PRINCIPAL'); }
+    async function handleHodLogin(e) { e.preventDefault(); loginUser(document.getElementById('hod-user').value, document.getElementById('hod-pass').value, 'HOD'); }
+    async function handleAdminLogin(e) { e.preventDefault(); loginUser(document.getElementById('admin-user').value, document.getElementById('admin-pass').value, 'ADMIN'); }
+
+    async function handleRegister(e) {
+        e.preventDefault();
+
+        const type = document.getElementById('reg-type').value;
+        const isAdminReq = document.getElementById('reg-is-admin').checked;
+
+        // Determine Role
+        const role = (type === 'STAFF' && isAdminReq) ? 'ADMIN' : type;
+
+        const user = {
+            username: document.getElementById('reg-username').value,
+            password: document.getElementById('reg-pass').value,
+            recoveryPin: document.getElementById('reg-pin').value,
+            role: role,
+            firstName: document.getElementById('reg-fname').value,
+            lastName: document.getElementById('reg-lname').value,
+            phoneNumber: document.getElementById('reg-phone').value,
+            branch: document.getElementById('reg-branch').value,
+            year: document.getElementById('reg-year').value,
+            registrationNumber: document.getElementById('reg-regno').value,
+            rollNumber: document.getElementById('reg-rollno').value,
+            employeeId: document.getElementById('reg-empid').value,
+            department: document.getElementById('reg-dept').value
+        };
+
+        try {
+            const res = await fetch(API_BASE + "/auth/register", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(user)
+            });
+
+            if(res.ok){
+                // --- NEW LOGIC: CUSTOM MESSAGES ---
+                if (role === 'ADMIN') {
+                    alert("Registration Successful!\n\nYour Administrative request has been passed to the Principal for approval.");
+                } else {
+                    alert("Registered Successfully! You may now login.");
+                }
+
+                switchAuthTab('login');
+                document.getElementById('form-register').reset(); // Optional: Clear form
+            } else {
+                alert("Registration Failed. Username might be taken.");
+            }
+        } catch(e) {
+            alert("Error connecting to server.");
+        }
+    }
+
+    async function loginUser(u, p, loginType) {
+        try {
+            const res = await fetch(API_BASE + "/auth/login", { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username:u, password:p}) });
+            const data = await res.json();
+
+            if(res.ok) {
+                const role = data.user.role;
+                const dept = data.user.department;
+
+                // 1. STANDARD LOGIN BLOCKING HIGH LEVELS
+                if (loginType === 'STANDARD' && (role === 'PRINCIPAL' || role === 'HOD' || role === 'ADMIN')) {
+                    alert("⛔ ACCESS DENIED\nHigh-level officials must use the Secure Gate button.");
+                    return;
+                }
+
+                // 2. PRINCIPAL CHECK
+                if (loginType === 'PRINCIPAL' && role !== 'PRINCIPAL') { alert("⛔ Not a Principal."); return; }
+
+                // 3. ADMIN CHECK
+                if (loginType === 'ADMIN' && role !== 'ADMIN') { alert("⛔ Not an Admin Account."); return; }
+
+                // 4. HOD CHECK (Role + Dept Match)
+                if (loginType === 'HOD') {
+                    if (role !== 'HOD') { alert("⛔ Not an HOD Account."); return; }
+                    if (dept !== gateSelectedDept) { alert(`⛔ SECURITY ALERT\nYou selected '${gateSelectedDept}' at the Gate, but this account belongs to '${dept}'.`); return; }
+                }
+
+                populateDashboard(data.user);
+            } else {
+                alert(data.message || "Login Failed");
+            }
+        } catch(e) { console.error(e); alert("Server Error"); }
+    }
+
+    function populateDashboard(user) {
+        currentUser = user; document.getElementById('view-auth').classList.add('hidden'); document.getElementById('view-dashboard').classList.remove('hidden'); document.getElementById('logout-btn').classList.remove('hidden'); document.getElementById('header-user').innerText = user.username; document.getElementById('header-user').classList.remove('hidden'); document.getElementById('dash-name').innerText = user.firstName; document.getElementById('dash-fullname').innerText = `${user.firstName} ${user.lastName}`; document.getElementById('dash-phone').innerText = user.phoneNumber; document.getElementById('dash-role-badge').innerText = user.role;
+        const btn = document.getElementById('btn-enter-app');
+        const d1=document.getElementById('dash-detail'), d2=document.getElementById('dash-subdetail');
+        if (user.role === 'STUDENT') { d1.innerText=`${user.branch} (${user.year} Year)`; d2.innerText=`Reg: ${user.registrationNumber||'N/A'}`; btn.innerText="Go to Issue Feed"; btn.className="px-10 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-full font-bold shadow-lg hover:scale-105 transition"; }
+        else if (user.role === 'HOD') { d1.innerText=`HOD - ${user.department}`; d2.innerText=`Emp: ${user.employeeId}`; btn.innerText="Go to HOD Console"; btn.className="px-10 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-full font-bold shadow-lg hover:scale-105 transition"; }
+        else if (user.role === 'PRINCIPAL') { d1.innerText="Principal"; d2.innerText="Admin Head"; btn.innerText="Go to Principal Console"; btn.className="px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full font-bold shadow-lg hover:scale-105 transition"; }
+        else { d1.innerText=`Dept: ${user.department}`; d2.innerText=`Emp: ${user.employeeId}`; btn.innerText=user.role==='ADMIN'?"Go to Admin Panel":"Go to Feed"; btn.className=user.role==='ADMIN'?"px-10 py-4 bg-gradient-to-r from-orange-600 to-red-600 rounded-full font-bold shadow-lg hover:scale-105 transition":"px-10 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-full font-bold shadow-lg hover:scale-105 transition"; }
+    }
+
+    // --- (Rest of your app functions remain unchanged) ---
+    // Make sure to include the updated 'renderFeed', 'renderHodBoard', and 'renderAdminBoard'
+    // from our previous discussions here to maintain the shadow workflow logic.
+
+    function enterMainApp() {
+        document.getElementById('view-dashboard').classList.add('hidden');
+        document.getElementById('view-main-app').classList.remove('hidden');
+        document.getElementById('bottom-nav').classList.remove('hidden');
+        document.getElementById('view-principal').classList.add('hidden');
+        document.getElementById('view-hod').classList.add('hidden');
+        document.getElementById('view-regular-app').classList.add('hidden');
+        if (currentUser.role === 'PRINCIPAL') {
+            document.getElementById('view-principal').classList.remove('hidden');
+            document.getElementById('bottom-nav').classList.add('hidden');
+            fetchAllPrincipalData();
+        }
+        else if (currentUser.role === 'HOD') {
+            document.getElementById('view-hod').classList.remove('hidden');
+            document.getElementById('bottom-nav').classList.add('hidden');
+            document.getElementById('hod-dept-name').innerText = currentUser.department;
+            fetchIssues();
+        }
+        else {
+            document.getElementById('view-regular-app').classList.remove('hidden');
+            if (currentUser.role === 'ADMIN') {
+                document.getElementById('nav-admin-btn').classList.remove('hidden');
+                document.getElementById('nav-add-btn').classList.add('hidden');
+                switchAppView('admin');
+            } else {
+                document.getElementById('nav-admin-btn').classList.add('hidden');
+                document.getElementById('nav-add-btn').classList.remove('hidden');
+                switchAppView('feed');
+            }
+            fetchIssues();
+        }
+    }
+
+    async function fetchAllPrincipalData() { const r1 = await fetch(API_BASE + "/principal/pending"); const d1 = await r1.json(); document.getElementById('count-pending').innerText = d1.length; renderPList('list-pending', d1, true, false); const r2 = await fetch(API_BASE + "/principal/accepted"); const d2 = await r2.json(); document.getElementById('count-accepted').innerText = d2.length; renderPList('list-accepted', d2, false, false); const r3 = await fetch(API_BASE + "/principal/rejected"); const d3 = await r3.json(); document.getElementById('count-rejected').innerText = d3.length; renderPList('list-rejected', d3, false, true); }
+    function renderPList(id, users, isPending, isRejected) { const list = document.getElementById(id); list.innerHTML = users.length ? "" : '<div class="text-slate-500 text-xs italic">Empty</div>'; users.forEach(u => { let actionHtml = ''; if(isPending) actionHtml = `<div class="flex gap-2"><button onclick="approveAdmin(${u.id})" class="bg-green-600 text-white p-2 rounded shadow hover:bg-green-500"><i class="fas fa-check"></i></button><button onclick="askRejectReason(${u.id})" class="bg-red-600 text-white p-2 rounded shadow hover:bg-red-500"><i class="fas fa-times"></i></button></div>`; else if(isRejected) actionHtml = `<div class="text-xs text-red-400 mt-1">Reason: "${u.rejectionReason}"</div>`; else actionHtml = `<div class="text-xs text-green-400 mt-1"><i class="fas fa-check-circle"></i> Active</div>`; list.innerHTML += `<div class="bg-slate-800/50 p-3 rounded-lg mb-2 flex justify-between items-start"><div><div class="font-bold text-sm">${u.firstName} ${u.lastName}</div><div class="text-xs text-slate-400">${u.employeeId} | ${u.department}</div>${!isPending ? actionHtml : ''}</div>${isPending ? actionHtml : ''}</div>`; }); }
+    async function approveAdmin(id) { await fetch(API_BASE + "/principal/approve/" + id, { method: 'PUT' }); fetchAllPrincipalData(); }
+    async function askRejectReason(id) { const reason = prompt("Why are you rejecting this request?"); if(reason) { await fetch(API_BASE + "/principal/reject/" + id + "?reason=" + encodeURIComponent(reason), { method: 'PUT' }); fetchAllPrincipalData(); } }
+
+    function switchAppView(view) { ['feed','report','admin'].forEach(v => document.getElementById('view-'+v).classList.add('hidden')); document.getElementById('view-'+view).classList.remove('hidden'); }
+    async function fetchIssues() {
+        try {
+            const res = await fetch(API_BASE+"/issues");
+            const data = await res.json();
+
+            globalIssuesData = data; // Save data for filtering later
+
+            if(currentUser.role === 'HOD') {
+                renderHodBoard(data);
+            } else if(currentUser.role === 'ADMIN'){
+                renderAdminBoard(data);
+            } else {
+                renderFeed(data);
+            }
+        } catch(e){ console.error(e); }
+    }
+
+    // --- FILTER LOGIC ---
+    function toggleCategoryFilter(category) {
+        // Toggle logic: If clicking the same one, turn it off (show all). Else, switch to new one.
+        if (activeCategoryFilter === category) {
+            activeCategoryFilter = null; // Reset
+        } else {
+            activeCategoryFilter = category; // Set Filter
+        }
+
+        // Re-render the current view with the stored data
+        if (currentUser.role === 'ADMIN') {
+            renderAdminBoard(globalIssuesData);
+        } else if (currentUser.role == 'HOD') { // Student/Staff
+            renderHodBoard(globalIssuesData);
+        }else {
+            renderFeed(globalIssuesData);
+        }
+    }
+
+    function renderCategoryStats(issues, targetContainerId) {
+        const container = document.getElementById(targetContainerId);
+        if(!container) return;
+
+        container.innerHTML = "";
+        const counts = {};
+
+        // 1. Calculate Counts
+        issues.forEach(i => {
+            // ADMIN FILTER: Admin stats should only count HOD-approved issues
+            if (currentUser.role === 'ADMIN' && !i.hodApproved) return;
+            // HOD FILTER: Only my department
+            if (currentUser.role === 'HOD' && i.targetDepartment !== currentUser.department) return;
+
+            const cat = i.category || "Other";
+            counts[cat] = (counts[cat] || 0) + 1;
+        });
+
+        const icons = {
+            "Electrical": "🔌", "Plumbing": "🚰", "Furniture": "🪑",
+            "IT": "💻", "Civil": "🧱", "Cleanliness": "🧹", "Other": "❓"
+        };
+
+        // 2. Render Clickable Boxes
+        for (const [cat, count] of Object.entries(counts)) {
+            const icon = icons[cat] || "📌";
+
+            // Highlight Logic: Is this the active filter?
+            const isActive = (activeCategoryFilter === cat);
+            const borderClass = isActive ? "border-cyan-400 bg-slate-700 ring-2 ring-cyan-500/50" : "border-slate-700 bg-slate-800 hover:border-slate-500";
+
+            const html = `
+            <button onclick="toggleCategoryFilter('${cat}')" class="${borderClass} p-2 rounded-lg flex flex-col items-center min-w-[80px] transition-all duration-200">
+                <span class="text-xs text-slate-400 mb-1">${icon} ${cat}</span>
+                <span class="text-lg font-bold text-white">${count}</span>
+            </button>`;
+            container.innerHTML += html;
+        }
+
+        // Add a "Clear Filter" button if a filter is active
+        if (activeCategoryFilter) {
+            container.innerHTML += `
+            <button onclick="toggleCategoryFilter(activeCategoryFilter)" class="bg-red-900/30 border border-red-500/50 p-2 rounded-lg flex flex-col items-center justify-center min-w-[80px] hover:bg-red-900/50 transition">
+                <span class="text-xs text-red-300 font-bold"><i class="fas fa-times"></i> Clear</span>
+            </button>`;
+        }
+    }
+
+    // --- STUDENT VIEW (The strict "Blind" Logic) ---
+    function renderFeed(issues) {
+        const cV=document.getElementById('feed-verify'), cP=document.getElementById('feed-progress'), cO=document.getElementById('feed-open'), cR=document.getElementById('feed-resolved');
+        cV.innerHTML=""; cP.innerHTML=""; cO.innerHTML=""; cR.innerHTML="";
+        let hV=false, hP=false, hR=false;
+        let countOpen=0, countProg=0, countRes=0;
+
+        renderCategoryStats(issues, 'category-stats-container');
+
+        issues.forEach(i => {
+            let displayStatus = "";
+            let statusBadge = "";
+            let cardClass = "glass";
+
+            if (activeCategoryFilter && i.category !== activeCategoryFilter) return;
+
+            // 1. PENDING HOD (Student sees: "Review")
+            if (!i.hodApproved && i.targetDepartment !== 'General') {
+                displayStatus = "PENDING_HOD";
+                statusBadge = `<span class="flex items-center gap-1 text-xs text-orange-400 font-bold border border-orange-500/30 px-2 py-1 rounded bg-orange-900/20"><i class="fas fa-clock animate-spin"></i> HOD Review</span>`;
+            }
+                // 2. OPEN OR ADMIN STARTED (Student sees: "Assigned")
+            // CRITICAL: Even if status is 'ADMIN_IN_PROGRESS', Student only sees "Assigned", not "Working" yet.
+            else if (i.status === 'OPEN' || i.status === 'ADMIN_IN_PROGRESS') {
+                displayStatus = "OPEN";
+                statusBadge = `<span class="text-xs text-cyan-400 font-bold border border-cyan-500/30 px-2 py-1 rounded bg-cyan-900/20"><i class="fas fa-clipboard-check"></i> Assigned to Admin</span>`;
+            }
+                // 3. WORKING OR ADMIN FINISHED (Student sees: "Working")
+            // CRITICAL: Even if status is 'ADMIN_RESOLVED', Student only sees "Working", not "Resolved" yet.
+            else if (i.status === 'IN_PROGRESS' || i.status === 'ADMIN_RESOLVED') {
+                displayStatus = "IN_PROGRESS";
+                statusBadge = `<span class="text-xs text-yellow-400 font-bold border border-yellow-500/30 px-2 py-1 rounded bg-yellow-900/20"><i class="fas fa-tools animate-pulse"></i> Work In Progress</span>`;
+            }
+            // 4. RESOLVED (Student finally sees "Resolved" only after HOD approves)
+            else if (i.status === 'RESOLVED') {
+                displayStatus = "RESOLVED";
+                statusBadge = `<span class="text-xs text-green-400 font-bold border border-green-500/30 px-2 py-1 rounded bg-green-900/20"><i class="fas fa-check-circle"></i> Resolved</span>`;
+            }
+
+            // ... (Rest of the renderFeed image/card logic remains the same) ...
+            const isCrit=(i.priority||'').toLowerCase().includes('critical'); if(isCrit) cardClass = "critical-pulse bg-red-900/10";
+
+            // LOGIC: IF NO IMAGE, RENDER NOTHING so text collapses
+            const imgHtml = i.imageUrl ? `<img onclick="openImage('${i.imageUrl}')" src="${i.imageUrl}" class="w-full h-32 object-cover rounded-lg mb-2 bg-slate-800 hover:opacity-80 transition cursor-pointer">` : '';
+
+            // COMMENTS: Only show if NOT in shadow state (unless it's General)
+            const isShadowState = (i.status === 'ADMIN_IN_PROGRESS' || i.status === 'ADMIN_RESOLVED');
+            let commentHtml = '';
+            if (i.adminComment && !isShadowState) {
+                commentHtml = `<div class="text-xs text-yellow-300 mt-2 border-t border-slate-700 pt-1 font-mono"><i class="fas fa-comment-dots"></i> Update: "${i.adminComment}"</div>`;
+            }
+
+            const refBadge = `<span class="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px] font-mono border border-slate-600">#${i.referenceId || '---'}</span>`;
+            const dateInfo = `<div class="grid grid-cols-2 gap-2 text-[10px] text-slate-400 mt-2 bg-slate-800/50 p-2 rounded border border-slate-700/50"><div>📅 Occurred:<br><span class="text-white font-mono">${i.occurrenceDate || 'N/A'}</span></div><div>📝 Reported:<br><span class="text-white font-mono">${i.timestamp}</span></div></div>`;
+
+            let card=`<div class="${cardClass} rounded-2xl p-4 mb-3"><div class="flex justify-between items-start mb-2"><div>${refBadge}<h3 class="font-bold mt-1">${i.title}</h3></div>${statusBadge}</div>${imgHtml}<p class="text-sm text-slate-300">${i.description}</p>${dateInfo}${commentHtml}<div class="text-xs text-slate-500 mt-2 flex justify-between pt-2 border-t border-slate-700/50"><span>${i.location}</span><span class="text-[9px] uppercase tracking-wider ${i.targetDepartment==='General'?'text-gray-400':'text-cyan-600'}">${i.targetDepartment} Dept</span></div>`;
+
+            if(displayStatus === 'RESOLVED' && !i.verified) {
+                card += `<div class="mt-3 pt-3 border-t border-blue-500/30"><p class="text-xs text-blue-300 mb-2 font-bold text-center">Are you satisfied with this fix?</p><div class="flex gap-2"><button onclick="verifyIssue(${i.id})" class="flex-1 bg-green-600 hover:bg-green-500 py-2 rounded text-xs font-bold shadow">YES</button><button onclick="openReopenModal(${i.id})" class="flex-1 bg-red-600 hover:bg-red-500 py-2 rounded text-xs font-bold shadow">NO</button></div></div></div>`;
+                cV.innerHTML += card; hV=true;
+            } else {
+                card += `</div>`;
+                if(displayStatus==='IN_PROGRESS'){ cP.innerHTML+=card; hP=true; countProg++; } else if(displayStatus==='RESOLVED'){ cR.innerHTML+=card; hR=true; countRes++; } else { cO.innerHTML+=card; countOpen++; }
+            }
+        });
+        document.getElementById('stat-open').innerText = countOpen; document.getElementById('stat-progress').innerText = countProg; document.getElementById('stat-resolved').innerText = countRes;
+        document.getElementById('section-verify').classList.toggle('hidden', !hV); document.getElementById('section-progress').classList.toggle('hidden', !hP); document.getElementById('section-resolved').classList.toggle('hidden', !hR);
+    }
+
+    // --- HOD CONSOLE (The Controller Logic) ---
+    function renderHodBoard(issues) {
+        renderCategoryStats(issues, 'hod-category-stats-container');
+        const listOpen = document.getElementById('hod-list-open');
+        const listProg = document.getElementById('hod-list-prog');
+        const listRes = document.getElementById('hod-list-res');
+
+        listOpen.innerHTML = ""; listProg.innerHTML = ""; listRes.innerHTML = "";
+        let cOpen=0, cProg=0, cRes=0;
+
+        if (!currentUser || !currentUser.department) return;
+        const myDept = currentUser.department.toUpperCase();
+
+        issues.forEach(i => {
+            const issueDept = (i.targetDepartment || "").toUpperCase();
+
+            // Filter: Only show issues for this HOD's department
+            if(issueDept !== myDept) return;
+            if(i.targetDepartment.toUpperCase() !== myDept) return;
+            // FILTER CHECK: Skip if category doesn't match
+            if (activeCategoryFilter && i.category !== activeCategoryFilter) return;
+
+            const imgThumbnail = i.imageUrl ? `<img onclick="openImage('${i.imageUrl}')" src="${i.imageUrl}" class="w-16 h-16 object-cover rounded border border-slate-600 hover:scale-110 transition cursor-pointer">` : '<div class="w-16 h-16 flex items-center justify-center bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-500">No Img</div>';
+            const refId = i.referenceId || '---';
+            let actionBtn = ''; let statusBadge = ''; let targetList = null;
+
+            // 1. NEW REQUESTS
+            if (!i.hodApproved) {
+                statusBadge = '<span class="text-xs text-orange-400 font-bold border border-orange-500/30 px-2 py-0.5 rounded">New Request</span>';
+                actionBtn = `<button onclick="assignToAdmin(${i.id})" class="w-full bg-cyan-600 hover:bg-cyan-500 py-2 rounded font-bold shadow transition mt-2 text-xs">FORWARD TO ADMIN <i class="fas fa-share ml-1"></i></button>`;
+                targetList = listOpen; cOpen++;
+            }
+            // 2. OPEN (Waiting for Admin)
+            else if (i.status === 'OPEN') {
+                statusBadge = '<span class="text-xs text-slate-400 font-bold border border-slate-500/30 px-2 py-0.5 rounded">Forwarded to Admin</span>';
+                targetList = listOpen; cOpen++;
+            }
+            // 3. ADMIN STARTED (Shadow State)
+            else if (i.status === 'ADMIN_IN_PROGRESS') {
+                statusBadge = '<span class="text-xs text-yellow-400 font-bold border border-yellow-500/30 px-2 py-0.5 rounded animate-pulse">⚠ Admin Started</span>';
+                actionBtn = `<button onclick="passInfo(${i.id})" class="w-full bg-yellow-600 hover:bg-yellow-500 py-2 rounded font-bold shadow transition mt-2 text-black text-xs">APPROVE & UPDATE STUDENT <i class="fas fa-check ml-1"></i></button>`;
+                targetList = listProg; cProg++;
+            }
+            // 4. PUBLIC IN PROGRESS
+            else if (i.status === 'IN_PROGRESS') {
+                statusBadge = '<span class="text-xs text-blue-400 font-bold border border-blue-500/30 px-2 py-0.5 rounded">Student Updated</span>';
+                targetList = listProg; cProg++;
+            }
+            // 5. ADMIN FINISHED (Shadow State)
+            else if (i.status === 'ADMIN_RESOLVED') {
+                statusBadge = '<span class="text-xs text-green-400 font-bold border border-green-500/30 px-2 py-0.5 rounded animate-pulse">⚠ Admin Finished</span>';
+                actionBtn = `<button onclick="passInfo(${i.id})" class="w-full bg-green-600 hover:bg-green-500 py-2 rounded font-bold shadow transition mt-2 text-xs">VERIFY & RESOLVE <i class="fas fa-check-double ml-1"></i></button>`;
+                targetList = listRes; cRes++;
+            }
+            // 6. RESOLVED
+            else if (i.status === 'RESOLVED') {
+                statusBadge = '<span class="text-xs text-slate-500 font-bold border border-slate-700 px-2 py-0.5 rounded">Closed</span>';
+                targetList = listRes; cRes++;
+            }
+
+            if(targetList) {
+                const card = `
+                <div class="bg-slate-800 p-3 rounded-lg border border-slate-700/50 hover:border-slate-500 transition relative">
+                    <div class="flex justify-between mb-2">
+                        <span class="text-[10px] font-mono text-cyan-400 bg-slate-900 px-1 rounded">#${refId}</span>
+                        ${statusBadge}
+                    </div>
+                    <div class="flex gap-3">
+                        ${imgThumbnail}
+                        <div class="flex-1 min-w-0">
+                            <div class="font-bold text-sm truncate text-white">${i.title}</div>
+                            <div class="text-xs text-slate-400 mt-1 line-clamp-2">${i.description}</div>
+                            ${i.adminComment ? `<div class="text-[10px] text-yellow-500/80 bg-slate-900/50 p-1.5 rounded mt-2 border-l-2 border-yellow-500">Admin: "${i.adminComment}"</div>` : ''}
+                        </div>
+                    </div>
+                    ${actionBtn}
+                </div>`;
+                targetList.innerHTML += card;
+            }
+        });
+
+        document.getElementById('cnt-hod-open').innerText = cOpen;
+        document.getElementById('cnt-hod-prog').innerText = cProg;
+        document.getElementById('cnt-hod-res').innerText = cRes;
+
+        if(cOpen === 0) listOpen.innerHTML = '<div class="text-slate-600 text-xs text-center py-4 italic">No open requests</div>';
+        if(cProg === 0) listProg.innerHTML = '<div class="text-slate-600 text-xs text-center py-4 italic">No active work</div>';
+        if(cRes === 0) listRes.innerHTML = '<div class="text-slate-600 text-xs text-center py-4 italic">No history</div>';
+    }
+
+    // --- ADMIN BOARD (Updated for Shadow Workflow) ---
+    function renderAdminBoard(issues) {
+        const aOpen = document.getElementById('admin-list-open');
+        const aProg = document.getElementById('admin-list-progress');
+        const aRes = document.getElementById('admin-list-resolved');
+
+        aOpen.innerHTML = ""; aProg.innerHTML = ""; aRes.innerHTML = "";
+        let cOpen = 0, cProg = 0, cRes = 0;
+
+        renderCategoryStats(issues, 'admin-category-stats-container');
+
+        issues.forEach(i => {
+            if (activeCategoryFilter && i.category !== activeCategoryFilter) return;
+            if(!i.hodApproved) return; // Admin only sees issues forwarded by HOD
+
+            const isCrit = (i.priority || '').toLowerCase().includes('critical');
+            const imgThumbnail = i.imageUrl ? `<img onclick="openImage('${i.imageUrl}')" src="${i.imageUrl}" class="w-16 h-16 object-cover rounded border border-slate-600 hover:scale-110 transition cursor-pointer">` : '<div class="w-16 h-16 bg-slate-800 rounded border border-slate-700 flex items-center justify-center text-[10px] text-slate-500">No Img</div>';
+            const refId = i.referenceId || '---';
+            const deptBadge = `<span class="bg-cyan-900 text-cyan-200 px-1 rounded text-[9px] mr-1">${i.targetDepartment || 'GEN'}</span>`;
+
+            let btns = '';
+            let statusLabel = '';
+            let targetList = null;
+
+            // 1. NEW ASSIGNMENT (Status: OPEN)
+            if (i.status === 'OPEN') {
+                statusLabel = '<span class="text-[10px] text-cyan-400">Incoming Task</span>';
+                btns = `<div class="flex gap-2 mt-2"><button onclick="setStat(${i.id},'inprogress')" class="flex-1 bg-yellow-600 py-1 rounded text-[10px] hover:bg-yellow-500">Take Job</button><button onclick="setStat(${i.id},'resolve')" class="flex-1 bg-green-600 py-1 rounded text-[10px] hover:bg-green-500">Quick Finish</button></div>`;
+                targetList = aOpen; cOpen++;
+            }
+            // 2. ACTIVE WORK (Status: IN_PROGRESS or ADMIN_IN_PROGRESS)
+            else if (i.status === 'IN_PROGRESS' || i.status === 'ADMIN_IN_PROGRESS') {
+                const isShadow = (i.status === 'ADMIN_IN_PROGRESS');
+                statusLabel = isShadow
+                    ? '<span class="text-[10px] text-orange-400 animate-pulse">⏳ Started (Pending HOD Fwd)</span>'
+                    : '<span class="text-[10px] text-yellow-400">Publicly Active</span>';
+
+                btns = `<div class="flex gap-2 mt-2"><button onclick="setStat(${i.id},'resolve')" class="flex-1 bg-green-600 py-1 rounded text-[10px] hover:bg-green-500">Mark Resolved</button></div>`;
+                targetList = aProg; cProg++;
+            }
+            // 3. RESOLVED (Status: RESOLVED or ADMIN_RESOLVED)
+            else if (i.status === 'RESOLVED' || i.status === 'ADMIN_RESOLVED') {
+                const isShadow = (i.status === 'ADMIN_RESOLVED');
+                statusLabel = isShadow
+                    ? '<span class="text-[10px] text-orange-400">⏳ Done (Pending HOD Verify)</span>'
+                    : '<span class="text-[10px] text-green-400">Closed</span>';
+
+                btns = `<div class="mt-1 text-[10px] text-slate-500 italic">No actions available</div>`;
+                targetList = aRes; cRes++;
+            }
+
+            if (targetList) {
+                const card = `
+                <div class="bg-slate-800 p-3 rounded-lg border-l-4 ${isCrit ? 'border-red-500' : 'border-slate-600'} mb-2">
+                    <div class="flex justify-between mb-1">
+                        <div>${deptBadge}<span class="text-[10px] font-mono text-cyan-400">#${refId}</span></div>
+                        ${statusLabel}
+                    </div>
+                    <div class="flex gap-3">
+                        ${imgThumbnail}
+                        <div class="flex-1 min-w-0">
+                            <div class="font-bold text-sm truncate text-white">${i.title}</div>
+                            <div class="text-xs text-slate-400 mt-1 truncate">${i.location}</div>
+                            ${i.adminComment ? `<div class="text-[10px] text-slate-500 italic mt-1 truncate">"${i.adminComment}"</div>` : ''}
+                        </div>
+                    </div>
+                    ${btns}
+                </div>`;
+                targetList.innerHTML += card;
+            }
+        });
+
+        document.getElementById('admin-stat-open').innerText = cOpen;
+        document.getElementById('admin-stat-progress').innerText = cProg;
+        document.getElementById('admin-stat-resolved').innerText = cRes;
+
+        document.getElementById('admin-sec-progress').classList.toggle('hidden', cProg === 0);
+        document.getElementById('admin-sec-resolved').classList.toggle('hidden', cRes === 0);
+    }
+
+    function openReopenModal(id) {
+        currentReopenId = id;
+        document.getElementById('reopen-reason').value = "";
+        document.getElementById('reopen-image').value = "";
+        document.getElementById('reopen-modal').classList.remove('hidden');
+    }
+
+    function closeReopenModal() {
+        currentReopenId = null;
+        document.getElementById('reopen-modal').classList.add('hidden');
+    }
+
+    async function submitReopen() {
+        if (!currentReopenId) return;
+
+        const reason = document.getElementById('reopen-reason').value;
+        const fileInput = document.getElementById('reopen-image');
+
+        if (!reason.trim()) {
+            alert("Please provide a reason.");
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append('reason', reason);
+        if (fileInput.files[0]) {
+            fd.append('proofImage', fileInput.files[0]);
+        }
+
+        try {
+            const res = await fetch(API_BASE + "/issues/" + currentReopenId + "/reopen", {
+                method: 'PUT',
+                body: fd
+            });
+
+            if (res.ok) {
+                closeReopenModal();
+                fetchIssues();
+            } else {
+                alert("Failed to reopen issue.");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Network Error");
+        }
+    }
+
+    async function submitReport(e) {
+        e.preventDefault();
+        const fd = new FormData();
+
+        // Append all fields
+        fd.append('title', document.getElementById('input-title').value);
+        fd.append('description', document.getElementById('input-desc').value);
+        fd.append('location', document.getElementById('input-location').value);
+        fd.append('category', document.getElementById('input-category').value); // <--- NEW
+        fd.append('occurrenceDate', document.getElementById('input-date').value);
+        fd.append('targetDepartment', document.getElementById('input-target-dept').value);
+        fd.append('manualPriority', document.getElementById('input-manual-priority').value);
+
+        if(document.getElementById('input-image').files[0]) {
+            fd.append('image', document.getElementById('input-image').files[0]);
+        }
+
+        await fetch(API_BASE+"/issues/report", {method:'POST', body:fd});
+
+        e.target.reset();
+        document.getElementById('ai-badge').innerText="Waiting...";
+        switchAppView('feed');
+        fetchIssues();
+    }
+    async function setStat(id, action) { let comment = ""; while(!comment) { comment = prompt(action === 'resolve' ? "Resolution Note (Mandatory):" : "Status Update (Mandatory):"); if(comment === null) return; if(comment.trim() === "") alert("You must provide a comment."); } await fetch(API_BASE+"/issues/"+id+"/"+action+"?comment="+encodeURIComponent(comment), {method:'PUT'}); fetchIssues(); }
+    async function assignToAdmin(id) { if(confirm("Approve this issue for Maintenance Team?")) { await fetch(API_BASE + "/issues/" + id + "/assign", { method: 'PUT' }); fetchIssues(); } }
+    async function passInfo(id) { const note = prompt("Add a note for the student (Optional):") || "Approved by HOD"; await fetch(API_BASE + "/issues/" + id + "/pass?hodComment=" + encodeURIComponent(note), { method: 'PUT' }); fetchIssues(); }
+    async function verifyIssue(id) { if(confirm("Confirm resolved?")) { await fetch(API_BASE+"/issues/"+id+"/verify", {method:'PUT'}); fetchIssues(); } }
+    function updateAIPreview() { const t=document.getElementById('input-desc').value.toLowerCase(); const b=document.getElementById('ai-badge'); b.innerText = (t.includes("fire")||t.includes("smoke")) ? "CRITICAL" : (t.includes("broken")?"Medium":"Low"); b.className = "font-bold " + (b.innerText==="CRITICAL"?"text-red-500 animate-pulse":"text-green-400"); }
+    function logout(){location.reload();}
+</script>
+</body>
+</html>
