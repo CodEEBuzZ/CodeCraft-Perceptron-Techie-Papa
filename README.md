@@ -28,12 +28,18 @@ The project is organized into the following directory structure based on the rep
 ```text
 ├── pulse                           # Main Backend Project Directory
 │   ├── src/main/java/com/campus/pulse
-│   │   ├── controller              # API Controllers (Endpoints)
-│   │   ├── model                   # Entity Models (Database Tables)
+│   │   ├── controller              # API Controllers
+│   │   │   ├── AuthController.java       # Handles User Authentication (Login/Signup)
+│   │   │   ├── IssueController.java      # Handles Reporting and Retrieving Issues
+│   │   │   └── PrincipalController.java  # Admin/Principal specific actions
+│   │   ├── model                   # Data Entities
+│   │   │   ├── Issue.java                # The Issue Entity (Database Table)
+│   │   │   ├── IssueStatus.java          # Enum for Status (OPEN, CLOSED, etc.)
+│   │   │   └── User.java                 # The User Entity (Database Table)
 │   │   ├── repository              # Database Repositories
 │   │   │   ├── IssueRepository.java
 │   │   │   └── UserRepository.java
-│   │   └── CampuspolseApplication.java  # Main Entry Point
+│   │   └── CampuspolseApplication.java   # Main Entry Point
 │   └── src/main/resources
 │       ├── static
 │       │   └── index.html          # Static Frontend Entry
