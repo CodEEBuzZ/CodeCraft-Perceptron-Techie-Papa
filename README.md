@@ -22,6 +22,20 @@ The system is built using the **Spring Boot** framework, ensuring scalability an
 
 ---
 
+## 📂 Project Structure
+
+The source code is located inside the `pulse` directory. Here is a guide to the key folders visible in the project:
+
+| Component | Path | Description |
+| :--- | :--- | :--- |
+| **Controllers** | `pulse/src/main/java/com/campus/pulse/controller` | **(Start Here)** Contains the API endpoints (e.g., `IssueController.java`) that handle web requests. |
+| **Models** | `pulse/src/main/java/com/campus/pulse/model` | Defines the data structure and database tables (e.g., `Issue.java`). |
+| **Repositories** | `pulse/src/main/java/com/campus/pulse/repository` | Handles database connections and SQL queries. |
+| **Main App** | `pulse/src/main/java/com/campus/pulse/CampuspolseApplication.java` | The entry point used to start the Spring Boot server. |
+| **Config** | `pulse/src/main/resources/application.properties` | Database configuration and server settings. |
+
+---
+
 ## 🛠️ Tech Stack
 
 * **Language:** Java
