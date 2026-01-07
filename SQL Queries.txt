@@ -1,0 +1,42 @@
+--Update in SQL after succesfully running the code
+
+USE campus_pulse;
+INSERT INTO users (
+    username, 
+    password, 
+    role, 
+    is_approved, 
+    first_name, 
+    last_name, 
+    phone_number, 
+    employee_id, 
+    department, 
+    recovery_pin
+) VALUES (
+    'principal',          -- Username
+    'drprincipal',        -- Password
+    'PRINCIPAL',          -- Role (Must match Java exactly)
+    true,                 -- is_approved (Principal is always approved)
+    'Dr. Sapan',          -- First Name
+    'Das',                -- Last Name
+    '9876543210',         -- Phone
+    'PRIN-001',           -- Employee ID
+    'Administration',     -- Department
+    '7777'                -- Recovery PIN
+);
+
+USE campus_pulse;
+
+-- Insert HODs for each department
+INSERT INTO users (username, password, role, is_approved, first_name, last_name, employee_id, department, recovery_pin) VALUES 
+('hod_cse', 'pass_cse', 'HOD', true, 'Head', 'CSE', 'HOD-01', 'CSE', '5555'),
+('hod_ece', 'pass_ece', 'HOD', true, 'Head', 'ECE', 'HOD-02', 'ECE', '5555'),
+('hod_me', 'pass_me', 'HOD', true, 'Head', 'ME', 'HOD-03', 'ME', '5555'),
+('hod_ee', 'pass_ee', 'HOD', true, 'Head', 'EE', 'HOD-04', 'EE', '5555'),
+('hod_ce', 'pass_ce', 'HOD', true, 'Head', 'CE', 'HOD-05', 'CE', '5555');
+
+USE campus_pulse;
+ALTER TABLE issues MODIFY COLUMN status VARCHAR(100);
+
+USE campus_pulse;
+ALTER TABLE issues ADD COLUMN category VARCHAR(355);
